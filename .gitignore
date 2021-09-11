@@ -1,3 +1,4 @@
 .git/
 .venv/
 errbot/__pycache__
+**/__pycache__/
