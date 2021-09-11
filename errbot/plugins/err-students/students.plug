@@ -1,0 +1,9 @@
+[Core]
+Name = Students
+Module = students
+
+[Documentation]
+Description = This is a plugin that handles most common student requests.
+
+[Python]
+Version = 2+
