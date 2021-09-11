@@ -7,10 +7,6 @@ import logging
 
 BACKEND = 'Slack'  # Errbot will start in text mode (console only mode) and will answer commands from there.
 
-BOT_IDENTITY = {
-    'token' : 'xoxb-2465499322295-2486435335204-lGQhb5LSi4P2BWbP1SUGgELZ'
-}
-
 BOT_DATA_DIR = r'D:\Scratch\NTNU-ErrBot\errbot\data'
 BOT_EXTRA_PLUGIN_DIR = r'D:\Scratch\NTNU-ErrBot\errbot\plugins'
 
