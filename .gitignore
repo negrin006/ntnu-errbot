@@ -1,1 +1,3 @@
 .git/
+.venv/
+errbot/__pycache__
