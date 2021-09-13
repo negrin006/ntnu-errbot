@@ -1,5 +1,6 @@
 from errbot import BotPlugin, re_botcmd
-
+from chatterbot import ChatBot
+from chatterbot.trainers import ChatterBotCorpusTrainer
 
 class ChatterBot(BotPlugin):
     """
@@ -8,10 +9,18 @@ class ChatterBot(BotPlugin):
     You can find me in your init directory in the subdirectory plugins.
     """
 
+    def activate(self):
+        super().activate()
+        self.chatbot = ChatBot('Blue')
+        self.trainer = ChatterBotCorpusTrainer()
+        # Train the chatbot based on the english corpus
+        self.trainer.train("chatterbot.corpus.english")
+
     @re_botcmd(pattern=r"(^| )cookie( |$)")  # flags a command
     def blue(self, msg, args):  # a command callable with !tryme
         """
         A test to received commands without prefix.
         """
-        yield "Here's a cookie for you, {}".format(msg.frm)
-        yield "/me hands out a cookie."
+        
+        resp = self.chatbot.get_response(msg)
+        return resp
