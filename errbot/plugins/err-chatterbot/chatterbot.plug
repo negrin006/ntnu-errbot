@@ -1,5 +1,5 @@
 [Core]
-Name = ChatterBot
+Name = ErrChatterBot
 Module = chatterbot
 
 [Documentation]
