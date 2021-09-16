@@ -1,4 +1,5 @@
 from errbot import BotPlugin, re_botcmd, botcmd
+import config
 
 from chatterbot import ChatBot
 from chatterbot.trainers import ChatterBotCorpusTrainer, ListTrainer
@@ -42,7 +43,7 @@ class ErrChatterBot(BotPlugin):
 
     @botcmd
     def stream( self, msg, args ):
-        stream = self.send_stream_request(msg.frm, open('/tmp/myfile.zip', 'r'), name='bills.zip', stream_type='application/zip')
+        stream = self.send_stream_request(msg.frm, open('/tmp/myfile.zip', 'rb'), name='bills.zip', stream_type="document" )
 
     # @re_botcmd(pattern=r"(^| )cookie( |$)")  # flags a command
     # def blue(self, msg, args):  # a command callable with !tryme
@@ -54,6 +55,7 @@ class ErrChatterBot(BotPlugin):
     #     return resp
 
     def callback_message(self, mess):
-        #self.send(mess.frm, "Message: " + mess.body )
-        resp = self.chatbot.get_response( mess.body )
-        self.send( mess.frm, str(resp) )
+        if mess and mess.body[0] != config.BOT_PREFIX:
+            #self.send(mess.frm, "Message: " + mess.body )
+            resp = self.chatbot.get_response( mess.body )
+            self.send( mess.frm, str(resp) )
