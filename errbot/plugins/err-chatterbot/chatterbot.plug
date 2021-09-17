@@ -1,8 +1,0 @@
-[Core]
-Name = ErrChatterBot
-Module = chatterbot
-
-[Documentation]
-Description = This is a plugin that connects errbot to chatterbot.
-[Python]
-Version = 2+

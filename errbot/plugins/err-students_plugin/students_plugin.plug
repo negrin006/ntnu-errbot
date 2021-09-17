@@ -1,6 +1,6 @@
 [Core]
-Name = Students
-Module = students
+Name = StudentsPlugin
+Module = students_plugin
 
 [Documentation]
 Description = This is a plugin that handles most common student requests.
