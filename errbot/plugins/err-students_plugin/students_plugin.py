@@ -73,7 +73,7 @@ class StudentsPlugin(BotPlugin):
     def process_input( self, mess ):
         for c in self.contexts:
             if ( not c.is_killed() ) and ( c.user == mess.frm ):
-                if c.blocked():
+                if c.is_blocked():
                     c.step( mess.body )
 
     def extract_course( self, mess ):
@@ -109,12 +109,16 @@ class StudentsPlugin(BotPlugin):
         while( self.do_work ):
             self.log.debug("Running thread")
             for c in self.contexts:
-                if not c.blocked():
-                    nxt = c.step()
-                    if nxt is not None:
-                        com, to, mess = nxt
-                        if com == 'send':
-                            self.send( to, mess )
+                if (not c.is_killed() ): 
+                    if not c.is_blocked():
+                        nxt = c.step()
+                        if nxt is not None:
+                            com, to, mess = nxt
+                            if com == 'send':
+                                self.send( to, mess )
+                    else:
+                        if ( time.time() > c.end_time ):
+                            c.cancel()
 
             time.sleep(1)
 

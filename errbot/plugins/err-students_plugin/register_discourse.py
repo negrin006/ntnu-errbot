@@ -1,6 +1,7 @@
 import discourse_context
+import time
 
-DC_INIT, DC_END, DC_ERROR, DC_KILLED, DC_NAME, DC_FINISH  = range(6)
+DC_INIT, DC_END, DC_CANCEL, DC_KILLED, DC_NAME, DC_FINISH  = range(6)
 
 class RegisterDiscourse(discourse_context.DiscourseContext):
     def __init__(self, author ):
@@ -9,6 +10,8 @@ class RegisterDiscourse(discourse_context.DiscourseContext):
 
     def step( self, response = None ):
         nxt = None
+
+        self.end_time = time.time() + self.timeout
 
         if (self.state == DC_INIT ):
             self.state = DC_NAME
@@ -20,8 +23,13 @@ class RegisterDiscourse(discourse_context.DiscourseContext):
         elif (self.state == DC_FINISH):
             self.state = DC_KILLED
             nxt = ('send', self.user, f'User {self.user}/{self.values["name"]} registered successfully for the course')
+        elif self.state == DC_CANCEL:
+            self.state = DC_KILLED
+            nxt = ('send', self.user, f'Timeout waiting for response' )
         self.last = nxt
         return nxt
             
-    def blocked( self ):
+    def is_blocked( self ):
         return self.state == DC_NAME
+
+    
