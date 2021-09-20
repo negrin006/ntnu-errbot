@@ -4,7 +4,7 @@ import register_discourse
 import threading
 import time
 
-class StudentsPlugin(BotPlugin):
+class JBTeachingPlugin(BotPlugin):
     """
     This is a very basic plugin to try out your new installation and get you started.
     Feel free to tweak me to experiment with Errbot.
@@ -43,13 +43,20 @@ class StudentsPlugin(BotPlugin):
         You can find me in your init directory in the subdirectory plugins.
         """
         
-        open_contexts = filter( lambda c:  c.user == msg.frm and c.state != DC_KILL, self.contexts )
+        open_contexts = filter( lambda c:  c.user == msg.frm and c.is_done(), self.contexts )
         for o in open_contexts:
-            o.kill()
+            o.reclaim()
 
-        d = register_discourse.RegisterDiscourse( msg.frm )
-        
+        d = register_discourse.RegisterDiscourse( self, msg.frm, self.register_course_cmd, self.cancel_cmd )       
         self.contexts.append( d )
+
+    def register_course_cmd( self, user, values ):
+        self.log( f"Execute register course {values}" )
+
+    def cancel_cmd( self, user, mess = None ):
+        self.send( user, "Command cancelled")
+        if mess:
+            self.send( user, mess )
 
     def callback_message(self, mess):
         self.log.debug( f'students.callback_message: {mess}')
@@ -72,8 +79,8 @@ class StudentsPlugin(BotPlugin):
 
     def process_input( self, mess ):
         for c in self.contexts:
-            if ( not c.is_killed() ) and ( c.user == mess.frm ):
-                if c.is_blocked():
+            if ( c.is_active() ) and ( c.user == mess.frm ):
+                if c.is_waiting():
                     c.step( mess.body )
 
     def extract_course( self, mess ):
@@ -109,18 +116,20 @@ class StudentsPlugin(BotPlugin):
         while( self.do_work ):
             self.log.debug("Running thread")
             for c in self.contexts:
-                if (not c.is_killed() ): 
-                    if not c.is_blocked():
+                if c.is_active(): 
+                    if not c.is_waiting():
                         nxt = c.step()
                         if nxt is not None:
                             com, to, mess = nxt
                             if com == 'send':
                                 self.send( to, mess )
+                            elif com == 'send_card':
+                                self.send_card( ** mess )
                     else:
                         if ( time.time() > c.end_time ):
                             c.cancel()
 
-            time.sleep(1)
+            time.sleep(0.5)
 
 
             

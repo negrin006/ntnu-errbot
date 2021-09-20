@@ -1,6 +1,6 @@
 [Core]
-Name = StudentsPlugin
-Module = students_plugin
+Name = JBTeachingPlugin
+Module = jb_teaching
 
 [Documentation]
 Description = This is a plugin that handles most common student requests.
