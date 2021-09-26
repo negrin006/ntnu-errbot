@@ -19,7 +19,7 @@ class QADiscourse(discourse_context.DiscourseContext):
             self.log.info( f"QADiscourse.step({response}) state {self.state} values {self.values}")
 
             if (self.state == DC_INIT ):
-                self.values = { 'response' : None }
+                self.values = { 'answer' : None }
                 self.state = DC_PROMPT
             elif (self.state == DC_PROMPT):
                 nxt = ('send', self.user, self.prompt )

@@ -1,5 +1,5 @@
 [Core]
-Name = JBTeachingPlugin
+Name = JB_TeachingPlugin
 Module = jb_teaching
 
 [Documentation]

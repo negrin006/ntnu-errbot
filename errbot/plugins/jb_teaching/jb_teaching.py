@@ -1,10 +1,11 @@
+from jb_database import JB_Database
 from errbot import BotPlugin, botcmd
 import spacy
 import register_discourse
 import threading
 import time
 
-class JBTeachingPlugin(BotPlugin):
+class JB_TeachingPlugin(BotPlugin):
     """
     This is a very basic plugin to try out your new installation and get you started.
     Feel free to tweak me to experiment with Errbot.
@@ -30,6 +31,7 @@ class JBTeachingPlugin(BotPlugin):
         self.worker = threading.Thread( target=self.run_worker, args=( self ) )
         self.do_work = True
         self.worker.start()
+        self.db = JB_Database( self.bot_config.JB_DATABASE )
 
     def deactivate(self):
         self.do_work = False
@@ -51,7 +53,7 @@ class JBTeachingPlugin(BotPlugin):
         self.contexts.append( d )
 
     def register_course_cmd( self, user, values ):
-        self.log( f"Execute register course {values}" )
+        self.log.info( f"Execute register course {values}" )
 
     def cancel_cmd( self, user, mess = None ):
         self.send( user, "Command cancelled")

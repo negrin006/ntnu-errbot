@@ -1,5 +1,6 @@
 import discourse_context
 import question_answer_discourse
+import menu_discourse
 import time
 
 DC_INIT, DC_SUCCESS, DC_CANCEL, DC_FINAL, \
@@ -54,6 +55,22 @@ class RegisterDiscourse(discourse_context.DiscourseContext):
             elif ( self.state == DC_ID_FINISH ):
                     if ( self.child.state == DC_SUCCESS ):
                         self.values["id"] = self.child.values["answer"]
+                        self.state = DC_COURSE_INIT
+                    else:
+                        self.state = DC_CANCEL
+                    self.child.reclaim()
+                    self.child = None
+            elif (self.state == DC_COURSE_INIT ):
+                self.child = menu_discourse.MenuDiscourse( self.bot, "course menu", self.user, "Which course do you want to register in?", [ "Artificial Intelligence (NKUST)", "Simultaneous Localization and Mapping (NTNU)", "Reinforcement Learning (NTNU)"] )
+                self.state = DC_COURSE
+            elif (self.state == DC_COURSE ):
+                if ( not self.child.is_done() ):
+                    nxt = self.child.step( response )
+                else:
+                    self.state = DC_COURSE_FINISH
+            elif (self.state == DC_COURSE_FINISH):
+                    if ( self.child.state == DC_SUCCESS ):
+                        self.values["course"] = self.child.values["answer"]
                         self.state = DC_REGISTER_PROMPT_1
                     else:
                         self.state = DC_CANCEL
@@ -65,7 +82,7 @@ class RegisterDiscourse(discourse_context.DiscourseContext):
                     'fields' : (
                         ('Name', self.values['name'] ),
                         ('Student Id', self.values['id'] ),
-                        ('Course', "*** todo"),
+                        ('Course', self.values['course']),
                     ),
                     'to': self.user
                 }
