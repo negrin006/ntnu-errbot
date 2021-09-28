@@ -15,7 +15,7 @@ class MenuDiscourse(discourse_context.DiscourseContext):
     def step( self, response = None ):
         nxt = None
 
-        while ( nxt is None ) and ( not self.is_done() ):
+        while ( nxt is None ) and ( not self.is_processed() ):
             self.end_time = time.time() + self.timeout
             self.log.info( f"MenuDiscourse.step({response}) state {self.state} values {self.values}")
 

@@ -45,7 +45,7 @@ class JB_TeachingPlugin(BotPlugin):
         You can find me in your init directory in the subdirectory plugins.
         """
         
-        open_contexts = filter( lambda c:  c.user == msg.frm and c.is_done(), self.contexts )
+        open_contexts = filter( lambda c:  c.user == msg.frm and c.is_processed(), self.contexts )
         for o in open_contexts:
             o.reclaim()
 
@@ -56,15 +56,16 @@ class JB_TeachingPlugin(BotPlugin):
         self.log.info( f"Execute register course {values}" )
 
     def cancel_cmd( self, user, mess = None ):
+        return
         self.send( user, "Command cancelled")
         if mess:
             self.send( user, mess )
 
     def callback_message(self, mess):
-        self.log.debug( f'students.callback_message: {mess}')
+        self.log.debug( f'jb_teaching.callback_message: {mess}')
 
         text = mess.body
-        if (text[-1] not in ['.', '!', '?']):
+        if (text) and (text[-1] not in ['.', '!', '?']):
             text = text + "."
 
         m = self.nlp( text )
@@ -81,7 +82,7 @@ class JB_TeachingPlugin(BotPlugin):
 
     def process_input( self, mess ):
         for c in self.contexts:
-            if ( c.is_active() ) and ( c.user == mess.frm ):
+            if ( not c.is_filled() ) and ( c.user == mess.frm ):
                 if c.is_waiting():
                     c.step( mess.body )
 
@@ -118,7 +119,7 @@ class JB_TeachingPlugin(BotPlugin):
         while( self.do_work ):
             self.log.debug("Running thread")
             for c in self.contexts:
-                if c.is_active(): 
+                if not c.is_filled(): 
                     if not c.is_waiting():
                         nxt = c.step()
                         if nxt is not None:
@@ -130,7 +131,8 @@ class JB_TeachingPlugin(BotPlugin):
                     else:
                         if ( time.time() > c.end_time ):
                             c.cancel()
-
+                elif not c.is_processed():
+                    pass
             time.sleep(0.5)
 
 

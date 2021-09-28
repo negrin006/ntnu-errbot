@@ -21,12 +21,13 @@ class DiscourseContext:
 
     def step( response = None ):
         self.log.info( f"DiscourseContext.step({response}) state {self.state} values {self.values}")
-        pass
 
     def reclaim( self ):
         self.state = DC_FINAL
 
     def cancel( self ):
+        if ( self.cancel_cmd ):
+            self.cancel_cmd( self )
         self.state = DC_CANCEL
 
     def is_waiting( self ):
@@ -36,12 +37,10 @@ class DiscourseContext:
         child.parent = self
         self.children.append( child )
 
-    def is_done( self ):
+    def is_filled( self ):
         return ( self.state == DC_SUCCESS ) or ( self.state == DC_CANCEL )
 
     def is_processed( self ):
         return ( self.state == DC_FINAL )
 
-    def is_active( self ):
-        return not self.is_processed()
 

@@ -7,7 +7,8 @@ DC_INIT, DC_SUCCESS, DC_CANCEL, DC_FINAL, \
 DC_NAME_INIT, DC_NAME, DC_NAME_FINISH, \
 DC_ID_INIT, DC_ID, DC_ID_FINISH, \
 DC_COURSE_INIT, DC_COURSE, DC_COURSE_FINISH, \
-DC_REGISTER_PROMPT_1, DC_REGISTER_INIT, DC_REGISTER, DC_REGISTER_FINISH, DC_REGISTER_CONFIRM  = range(18)
+DC_REGISTER_PROMPT_1, DC_REGISTER_INIT, DC_REGISTER, DC_REGISTER_FINISH, DC_REGISTER_CONFIRM, \
+DC_DO_CANCEL_PRE, DC_DO_CANCEL = range(20)
 
 CANCEL_RESPONSES = ["cancel", "quit", "no", "bye"]
 
@@ -19,7 +20,7 @@ class RegisterDiscourse(discourse_context.DiscourseContext):
     def step( self, response = None ):
         nxt = None
 
-        while (nxt is None ) and (not self.is_done() ):
+        while (nxt is None ) and (not self.is_processed() ):
             self.end_time = time.time() + self.timeout
             self.log.info( f"RegisterDiscourse.step({response}) state {self.state} values {self.values}")
             if (self.state == DC_INIT ):
@@ -30,7 +31,7 @@ class RegisterDiscourse(discourse_context.DiscourseContext):
                 self.child = question_answer_discourse.QADiscourse(self.bot, "register name", self.user, "What is your name?" )
                 self.state = DC_NAME
             elif (self.state == DC_NAME):
-                if ( not self.child.is_done() ):
+                if ( not self.child.is_filled() ):
                     nxt = self.child.step( response )
                 else:
                     self.state = DC_NAME_FINISH
@@ -39,16 +40,14 @@ class RegisterDiscourse(discourse_context.DiscourseContext):
                         self.values["name"] = self.child.values["answer"]
                         self.state = DC_ID_INIT
                     else:
-                        self.cancel()
-                        if (self.cancel_cmd):
-                            self.cancel_cmd( self.bot, "Command was cancelled" )
+                        self.state = DC_DO_CANCEL_PRE
                     self.child.reclaim()
                     self.child = None
             elif (self.state == DC_ID_INIT):
                 self.child = question_answer_discourse.QADiscourse(self.bot, "register id", self.user, "What is your student id?")
                 self.state = DC_ID
             elif (self.state == DC_ID):
-                if ( not self.child.is_done() ):
+                if ( not self.child.is_filled() ):
                     nxt = self.child.step( response )
                 else:
                     self.state = DC_ID_FINISH
@@ -57,14 +56,14 @@ class RegisterDiscourse(discourse_context.DiscourseContext):
                         self.values["id"] = self.child.values["answer"]
                         self.state = DC_COURSE_INIT
                     else:
-                        self.state = DC_CANCEL
+                        self.state = DC_DO_CANCEL_PRE
                     self.child.reclaim()
                     self.child = None
             elif (self.state == DC_COURSE_INIT ):
                 self.child = menu_discourse.MenuDiscourse( self.bot, "course menu", self.user, "Which course do you want to register in?", [ "Artificial Intelligence (NKUST)", "Simultaneous Localization and Mapping (NTNU)", "Reinforcement Learning (NTNU)"] )
                 self.state = DC_COURSE
             elif (self.state == DC_COURSE ):
-                if ( not self.child.is_done() ):
+                if ( not self.child.is_filled() ):
                     nxt = self.child.step( response )
                 else:
                     self.state = DC_COURSE_FINISH
@@ -73,7 +72,7 @@ class RegisterDiscourse(discourse_context.DiscourseContext):
                         self.values["course"] = self.child.values["answer"]
                         self.state = DC_REGISTER_PROMPT_1
                     else:
-                        self.state = DC_CANCEL
+                        self.state = DC_DO_CANCEL_PRE
                     self.child.reclaim()
                     self.child = None
             elif (self.state == DC_REGISTER_PROMPT_1):
@@ -92,7 +91,7 @@ class RegisterDiscourse(discourse_context.DiscourseContext):
                 self.child = question_answer_discourse.QADiscourse(self.bot, "register id", self.user, "Do you want to register this user?")                
                 self.state = DC_REGISTER
             elif (self.state == DC_REGISTER):
-                if ( not self.child.is_done() ):
+                if ( not self.child.is_filled() ):
                     nxt = self.child.step( response )
                 else:
                     self.state = DC_REGISTER_FINISH
@@ -102,13 +101,21 @@ class RegisterDiscourse(discourse_context.DiscourseContext):
                     if (ans.lower() == 'yes' ):
                         self.state = DC_REGISTER_CONFIRM
                 else:
-                    self.state = DC_CANCEL
+                    self.state = DC_DO_CANCEL_PRE
                 self.child.reclaim()
                 self.child = None
             elif ( self.state == DC_REGISTER_CONFIRM ):
                 if self.success_cmd:
                     self.success_cmd( self.bot, self.values )
                 self.state = DC_FINAL
+            elif ( self.state == DC_DO_CANCEL_PRE ):
+                nxt = ("send", self.user, "Course registration cancelled")
+                self.state = DC_DO_CANCEL
+            elif (self.state == DC_DO_CANCEL):
+                self.cancel()
+                if (self.cancel_cmd):
+                    self.cancel_cmd( self.bot, "Command was cancelled" )
+
         self.last = nxt
         self.log.info( f"RegisterDiscourse.step returns state {self.state} values {self.values} nxt {nxt}")
 

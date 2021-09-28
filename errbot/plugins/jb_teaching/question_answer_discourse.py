@@ -14,7 +14,7 @@ class QADiscourse(discourse_context.DiscourseContext):
     def step( self, response = None ):
         nxt = None
 
-        while ( nxt is None ) and ( not self.is_done() ):
+        while ( nxt is None ) and ( not self.is_processed() ):
             self.end_time = time.time() + self.timeout
             self.log.info( f"QADiscourse.step({response}) state {self.state} values {self.values}")
 
@@ -38,7 +38,7 @@ class QADiscourse(discourse_context.DiscourseContext):
                     self.cancel()
                     nxt = ( 'cancelled', self.user, self.values )
                     if (self.cancel_cmd):
-                        self.cancel_cmd( self.bot, "The command was cancelled")
+                        self.cancel_cmd( self.bot, self.user, "The command was cancelled")
         self.last = nxt
         self.log.info( f"QADiscourse.step returns state {self.state} values {self.values} nxt {nxt}")
 

@@ -1,6 +1,6 @@
 CREATE TABLE courses (
     title TEXT NOT NULL UNIQUE PRIMARY KEY,
-    university TEXT NOT NULL
+    university TEXT NOT NULL,
     url TEXT NOT NULL
 );
 
