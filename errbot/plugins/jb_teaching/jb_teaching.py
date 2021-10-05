@@ -4,6 +4,7 @@ import spacy
 import register_discourse
 import threading
 import time
+import asyncio
 
 class JB_TeachingPlugin(BotPlugin):
     """
@@ -64,28 +65,29 @@ class JB_TeachingPlugin(BotPlugin):
     def callback_message(self, mess):
         self.log.debug( f'jb_teaching.callback_message: {mess}')
 
-        text = mess.body
-        if (text) and (text[-1] not in ['.', '!', '?']):
-            text = text + "."
+        ret = self.process_waiting( mess )
+        if ( not ret ):
+            text = mess.body
+            if (text) and (text[-1] not in ['.', '!', '?']):
+                text = text + "."
 
-        m = self.nlp( text )
-        for r in self.register_prompts:
-            if r.similarity( m ) > 0.80:
-                self.log.info( f'Found register prompt {text}' )
-                course = self.extract_course( m )
-                self.log.info( f'course {course}')
-                for token in m:
-                    self.log.info( f'{token.text}, {token.pos_} {token.has_vector}, {token.vector_norm}, {token.is_oov}' )
-                break
+            m = self.nlp( text )
+            for r in self.register_prompts:
+                if r.similarity( m ) > 0.80:
+                    self.log.info( f'Found register prompt {text}' )
+                    course = self.extract_course( m )
+                    self.log.info( f'course {course}')
+                    for token in m:
+                        self.log.info( f'{token.text}, {token.pos_} {token.has_vector}, {token.vector_norm}, {token.is_oov}' )
+                    break
         
-        self.process_input( mess )
 
     def process_input( self, mess ):
         for c in self.contexts:
-            if ( not c.is_filled() ) and ( c.user == mess.frm ):
-                if c.is_waiting():
-                    c.step( mess.body )
-
+            user, queue = c
+            if user == mess.frm:
+                queue.put( mess )
+    
     def extract_course( self, mess ):
         course = None
         start_tokens = [ 'in' ]
@@ -117,23 +119,53 @@ class JB_TeachingPlugin(BotPlugin):
 
     def run_worker( self ):
         while( self.do_work ):
-            self.log.debug("Running thread")
-            for c in self.contexts:
-                if not c.is_filled(): 
-                    if not c.is_waiting():
-                        nxt = c.step()
-                        if nxt is not None:
-                            com, to, mess = nxt
-                            if com == 'send':
-                                self.send( to, mess )
-                            elif com == 'send_card':
-                                self.send_card( ** mess )
-                    else:
-                        if ( time.time() > c.end_time ):
-                            c.cancel()
-                elif not c.is_processed():
-                    pass
+            # self.log.debug("Running thread")
+            # for c in self.contexts:
+            #     if not c.is_filled(): 
+            #         if not c.is_waiting():
+            #             nxt = c.step()
+            #             if nxt is not None:
+            #                 com, to, mess = nxt
+            #                 if com == 'send':
+            #                     self.send( to, mess )
+            #                 elif com == 'send_card':
+            #                     self.send_card( ** mess )
+            #         else:
+            #             if ( time.time() > c.end_time ):
+            #                 c.cancel()
+            #     elif not c.is_processed():
+            #         pass
             time.sleep(0.5)
 
+    @botcmd
+    def qatest( self, msg, args ):  # a command callable with /register
+        asyncio.run( self.qa_test_cmd(msg.frm, msg, args) )
 
-            
+    async def async_send( self, to, msg ):
+        return self.send( to, msg )
+
+    async def async_receive( self, user ):
+        q = asyncio.Queue()
+        cont = ( user, q )
+
+        self.contexts.append( cont )
+        resp = await q.get()
+        err = None
+
+        if resp == "cancel":
+            err = "Cancel"
+        return ( resp, err )
+
+    async def qa_test_cmd( self, user, msg, args ):
+        await self.async_send( user, "Are you ready to test the system?")
+        await self.async_send( user, "Please enter your name?")
+        name, err = await self.async_receive( user )
+        if err:
+            if err == "Timeout":
+                await self.async_send(user, "The command was cancelled")
+            else:
+                await self.async_send( user, "The command was cancelled")
+        await self.async_send( user, f"Nice to meet you user {name}")
+
+    
+        
