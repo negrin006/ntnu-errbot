@@ -6,6 +6,8 @@ import register_discourse
 import threading
 import time
 import asyncio
+import threading
+import functools
 
 class JB_TeachingPlugin(BotPlugin):
     """
@@ -34,7 +36,7 @@ class JB_TeachingPlugin(BotPlugin):
         self.do_work = True
         self.worker.start()
         self.db = JB_Database( self.bot_config.JB_DATABASE )
-
+        
     def deactivate(self):
         self.do_work = False
         self.worker.join()
@@ -82,41 +84,30 @@ class JB_TeachingPlugin(BotPlugin):
                         self.log.info( f'{token.text}, {token.pos_} {token.has_vector}, {token.vector_norm}, {token.is_oov}' )
                     break
         
+    def find_context_by_user( self, user ):
+        self.log.debug( f"find_context_by_user {self.contexts} {user}")
+        ret = (-1, None)
+        for i,c in enumerate( self.contexts ):
+            u, q, l = c
+            if u == user:
+                ret = ( i, c )
+                break
+        self.log.debug( f"find_context_by_user returns {ret}")
+        return ret
+    
+    def delete_context( self, ind ):
+        del self.contexts[ind]
 
     def process_waiting( self, mess ):
-        self.log.debug( f'jb_teaching.process_waiting( {mess} )')
-        self.log.debug( f'jb_teaching.process_waiting {self.contexts}')
-        
-        handled = False
-        for c in self.contexts:
-            user, queue = c
-            if user == mess.frm:
-                self.log.debug( f'jb_teaching.process_waiting putting into the queue {mess}')
-        
-                queue.put_nowait( mess )
-                #asyncio.gather( future )
-                handled = True
-        self.log.debug( f'jb_teaching.process_waiting returns {handled}')
-        return handled
-
-    def find_context( self, user ):
-        ret = None
-        for i,c in enumerate( self.contexts ):
-            u, queue = c
-            if u == user:
-                ret = (i, c)
-                break
+        ret = False
+        ind, con = self.find_context_by_user( mess.frm )
+        if ind >= 0:
+            user, queue, loop = con
+            asyncio.run_coroutine_threadsafe( queue.put( mess ), loop )
+            self.log.debug("value entered into queue")
+            ret = True
         return ret
-
-    def remove_context( self, user ):
-        ret = self.find_context( user )
-        rem = False
-        if ret:
-            ind, con = ret
-            del( self.contexts[ind] )
-            rem = True
-        return rem
-
+    
     def extract_course( self, mess ):
         course = None
         start_tokens = [ 'in' ]
@@ -168,48 +159,52 @@ class JB_TeachingPlugin(BotPlugin):
 
     @botcmd
     def qatest( self, msg, args ):  # a command callable with /register
-        asyncio.run( self.qa_test_cmd(msg.frm, msg, args) )
+        #asyncio.run( self.qa_test_cmd(msg.frm, msg, args) )
+        # qaloop = asyncio.new_event_loop()
+        # thread = threading.Thread( name = "qatest", target = self.qa_test_cmd_looper, args = ( qaloop, msg.frm, msg, args ) )
+        # thread.start()
+        # time.sleep(10)
+        # self.log.debug(asyncio.Task.all_tasks(qaloop))
+        asyncio.run( self.qa_test_cmd( msg.frm, msg, args ) )
 
     async def async_send( self, to, msg ):
         return self.send( to, msg )
 
     async def async_receive( self, user ):
-        self.log.debug( f'jb_teaching.async_receive {user}')
+        self.log.debug("async_receive")
+        self.log.debug("waiting for the queue")
         
-        result = ("", "Error" )
-        ret = self.find_context( user )
-        self.log.debug( f'jb_teaching.async_receive find context {ret}')
-            
-        if not ret:
-            q = asyncio.Queue()
-            cont = ( user, q )
-            self.log.debug( f'jb_teaching.async_receive create context {cont}')
-            
-            self.contexts.append( cont )
-            self.log.debug( f'jb_teaching.async_receive contexts {self.contexts} await queue.get {user} {q}')
-        
+        ind, con = self.find_context_by_user( user )
+        resp = "NO RESPONSE"
+
+        if ( ind >= 0 ):
+            u, queue, loop = con
             # resp = None
-            # while resp is None:
+            # while( resp is None ):
             #     try:
             #         resp = q.get_nowait()
+                    
             #     except QueueEmpty:
-            #         self.log.warning("Queue is empty")
             #         resp = None
             #     await asyncio.sleep(0.5)
-            resp = await q.get()
-            err = None
+            resp = await queue.get( )
+        err = None
+        self.log.debug( f"queue received value {resp}")
+        
+        if resp == "cancel":
+            err = "Cancel"
+        return ( resp, err )
 
-            self.log.debug( f'jb_teaching.async_receive got resp {resp}')
-            if resp == "cancel":
-                result = ("cancel", "Cancel")
-            else:
-                result = (resp, None)
-                self.remove_context(user)
-        else:
-            result = ("", "Already waiting for response")
-        return result
+    def qa_test_cmd_looper( self, loop, user, msg, args ):
+        asyncio.run( self.qa_test_cmd( user, msg, args ) )
 
     async def qa_test_cmd( self, user, msg, args ):
+        self.log.debug("qa_test_cmd started")
+
+        q = asyncio.Queue( 1 )
+        loop = asyncio.get_event_loop()
+        self.contexts.append( ( user, q, loop ) )
+        
         await self.async_send( user, "Are you ready to test the system?")
         await self.async_send( user, "Please enter your name?")
         name, err = await self.async_receive( user )
@@ -219,6 +214,3 @@ class JB_TeachingPlugin(BotPlugin):
             else:
                 await self.async_send( user, f"The command was cancelled {err}")
         await self.async_send( user, f"Nice to meet you user {name}")
-
-    
-        
