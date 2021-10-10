@@ -165,7 +165,7 @@ class JB_TeachingPlugin(BotPlugin):
         # thread.start()
         # time.sleep(10)
         # self.log.debug(asyncio.Task.all_tasks(qaloop))
-        asyncio.run( self.qa_test_cmd( msg.frm, msg, args ) )
+        asyncio.run( self.qa_test_cmd( msg.fr, msg, args ) )
 
     async def async_send( self, to, msg ):
         return self.send( to, msg )
@@ -195,16 +195,12 @@ class JB_TeachingPlugin(BotPlugin):
             err = "Cancel"
         return ( resp, err )
 
-    def qa_test_cmd_looper( self, loop, user, msg, args ):
-        asyncio.run( self.qa_test_cmd( user, msg, args ) )
+    # def qa_test_cmd_looper( self, loop, user, msg, args ):
+    #     asyncio.run( self.qa_test_cmd( user, msg, args ) )
 
     async def qa_test_cmd( self, user, msg, args ):
         self.log.debug("qa_test_cmd started")
 
-        q = asyncio.Queue( 1 )
-        loop = asyncio.get_event_loop()
-        self.contexts.append( ( user, q, loop ) )
-        
         await self.async_send( user, "Are you ready to test the system?")
         await self.async_send( user, "Please enter your name?")
         name, err = await self.async_receive( user )
