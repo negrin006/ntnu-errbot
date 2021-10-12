@@ -8,6 +8,7 @@ import time
 import asyncio
 import threading
 import functools
+import discourse_context
 
 class JB_TeachingPlugin(BotPlugin):
     """
@@ -32,9 +33,9 @@ class JB_TeachingPlugin(BotPlugin):
 
         self.contexts = []
 
-        self.worker = threading.Thread( target=self.run_worker, args=( self ) )
-        self.do_work = True
-        self.worker.start()
+        # self.worker = threading.Thread( target=self.run_worker, args=( self ) )
+        # self.do_work = True
+        # self.worker.start()
         self.db = JB_Database( self.bot_config.JB_DATABASE )
         
     def deactivate(self):
@@ -87,10 +88,9 @@ class JB_TeachingPlugin(BotPlugin):
     def find_context_by_user( self, user ):
         self.log.debug( f"find_context_by_user {self.contexts} {user}")
         ret = (-1, None)
-        for i,c in enumerate( self.contexts ):
-            u, q, l = c
-            if u == user:
-                ret = ( i, c )
+        for i,con in enumerate( self.contexts ):
+            if user == con.user:
+                ret = ( i, con )
                 break
         self.log.debug( f"find_context_by_user returns {ret}")
         return ret
@@ -102,9 +102,10 @@ class JB_TeachingPlugin(BotPlugin):
         ret = False
         ind, con = self.find_context_by_user( mess.frm )
         if ind >= 0:
-            user, queue, loop = con
-            asyncio.run_coroutine_threadsafe( queue.put( mess ), loop )
-            self.log.debug("value entered into queue")
+            self.log.debug( f"process_waiting {con}")
+            if con.waiting:
+                asyncio.run_coroutine_threadsafe( con.queue.put( mess ), con.loop )
+                self.log.debug("value entered into queue")
             ret = True
         return ret
     
@@ -165,48 +166,41 @@ class JB_TeachingPlugin(BotPlugin):
         # thread.start()
         # time.sleep(10)
         # self.log.debug(asyncio.Task.all_tasks(qaloop))
-        asyncio.run( self.qa_test_cmd( msg.fr, msg, args ) )
+        asyncio.run( self.qa_test_cmd_runner( msg.frm, msg, args ) )
 
-    async def async_send( self, to, msg ):
-        return self.send( to, msg )
-
-    async def async_receive( self, user ):
-        self.log.debug("async_receive")
-        self.log.debug("waiting for the queue")
-        
+    async def qa_test_cmd_runner( self, user, msg, args ):
         ind, con = self.find_context_by_user( user )
         resp = "NO RESPONSE"
 
-        if ( ind >= 0 ):
-            u, queue, loop = con
-            # resp = None
-            # while( resp is None ):
-            #     try:
-            #         resp = q.get_nowait()
-                    
-            #     except QueueEmpty:
-            #         resp = None
-            #     await asyncio.sleep(0.5)
-            resp = await queue.get( )
-        err = None
-        self.log.debug( f"queue received value {resp}")
+        if ( ind < 0 ):
+            con = discourse_context.DiscourseContext(self, "dc_qa_test", msg.frm, 10 )
+            self.contexts.append( con )
+            self.log.debug( f"added context for user {user} contexts: {self.contexts}")
+            ret = await self.qa_test_cmd( user, msg, args )
+            self.delete_context( ind )
+        else:
+            self.send( user, "You are already in a dialogue")
+            self.send( user, "Enter cancel to terminate previous dialog")            
+            return "User already started a discourse"
         
-        if resp == "cancel":
-            err = "Cancel"
-        return ( resp, err )
-
-    # def qa_test_cmd_looper( self, loop, user, msg, args ):
-    #     asyncio.run( self.qa_test_cmd( user, msg, args ) )
-
     async def qa_test_cmd( self, user, msg, args ):
         self.log.debug("qa_test_cmd started")
+        ind, con = self.find_context_by_user( user )
+        if ind >= 0:
+            await con.async_send( user, "Are you ready to test the system?")
+            await con.async_send( user, "Please enter your name?")
+            name, err = await con.async_receive( )
+            self.log.debug( f"qa_test_cmd received {name},{err}")
+            if err:
+                if err == "Timeout":
+                    await con.async_send(user, "The command timed out")
+                    return "Command timeout"
+                else:
+                    await con.async_send( user, f"The command was cancelled {err}")
+                    return "Command cancelled"
+            await con.async_send( user, f"Nice to meet you user {name}")
+            return None
+        else:
+            self.send( f" qatest: context {user} not found")
+        return "Invalid Context"
 
-        await self.async_send( user, "Are you ready to test the system?")
-        await self.async_send( user, "Please enter your name?")
-        name, err = await self.async_receive( user )
-        if err:
-            if err == "Timeout":
-                await self.async_send(user, "The command timed out")
-            else:
-                await self.async_send( user, f"The command was cancelled {err}")
-        await self.async_send( user, f"Nice to meet you user {name}")
