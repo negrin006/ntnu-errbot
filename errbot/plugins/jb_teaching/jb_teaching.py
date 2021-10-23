@@ -12,9 +12,7 @@ import discourse_context
 
 class JB_TeachingPlugin(BotPlugin):
     """
-    This is a very basic plugin to try out your new installation and get you started.
-    Feel free to tweak me to experiment with Errbot.
-    You can find me in your init directory in the subdirectory plugins.
+    This plugin supports my teaching <jacky.baltes@ntnu.edu.tw>
     """
 
     def activate(self):
@@ -44,27 +42,14 @@ class JB_TeachingPlugin(BotPlugin):
 
     @botcmd  # flags a command
     def register( self, msg, args ):  # a command callable with /register
-        """
-        Execute to check if Errbot responds to command.
-        Feel free to tweak me to experiment with Errbot.
-        You can find me in your init directory in the subdirectory plugins.
-        """
-        
-        open_contexts = filter( lambda c:  c.user == msg.frm and c.is_processed(), self.contexts )
-        for o in open_contexts:
-            o.reclaim()
-
-        d = register_discourse.RegisterDiscourse( self, msg.frm, self.register_course_cmd, self.cancel_cmd )       
-        self.contexts.append( d )
-
-    def register_course_cmd( self, user, values ):
-        self.log.info( f"Execute register course {values}" )
-
-    def cancel_cmd( self, user, mess = None ):
-        return
-        self.send( user, "Command cancelled")
-        if mess:
-            self.send( user, mess )
+        "register for a course"
+        d = register_discourse.RegisterDiscourse( self, msg.frm ) 
+        err = self.add_context( d )
+        if not err:
+            ret = d.run( msg, args )
+        elif err == "Already registered":
+            self.send( msg.frm, "You are already in a dialogue")
+            self.send( msg.frm, "Enter cancel to terminate previous dialog")
 
     def callback_message(self, mess):
         self.log.debug( f'jb_teaching.callback_message: {mess}')
@@ -95,18 +80,34 @@ class JB_TeachingPlugin(BotPlugin):
         self.log.debug( f"find_context_by_user returns {ret}")
         return ret
     
-    def delete_context( self, ind ):
+    def delete_context_by_index( self, ind ):
         del self.contexts[ind]
+
+    def delete_context( self, con ):
+        return self.contexts.remove( con )
+
+    def add_context(self, con):
+        ind, _ = self.find_context_by_user( con.user )
+        err = None
+        if ( ind < 0 ):
+            self.contexts.append( con )
+            self.log.debug( f"added context for user {con.user} contexts: {self.contexts}")
+        else:
+            err = "Already registered"
+        return err 
 
     def process_waiting( self, mess ):
         ret = False
-        ind, con = self.find_context_by_user( mess.frm )
-        if ind >= 0:
-            self.log.debug( f"process_waiting {con}")
-            if con.waiting:
-                asyncio.run_coroutine_threadsafe( con.queue.put( mess ), con.loop )
-                self.log.debug("value entered into queue")
-            ret = True
+        text = mess.body
+
+        if text[0] != '/':
+            ind, con = self.find_context_by_user( mess.frm )
+            if ind >= 0:
+                self.log.debug( f"process_waiting {con}")
+                if con.waiting:
+                    asyncio.run_coroutine_threadsafe( con.queue.put( mess ), con.loop )
+                    self.log.debug("value entered into queue")
+                ret = True
         return ret
     
     def extract_course( self, mess ):
@@ -158,49 +159,43 @@ class JB_TeachingPlugin(BotPlugin):
             #         pass
             time.sleep(0.5)
 
-    @botcmd
-    def qatest( self, msg, args ):  # a command callable with /register
-        #asyncio.run( self.qa_test_cmd(msg.frm, msg, args) )
-        # qaloop = asyncio.new_event_loop()
-        # thread = threading.Thread( name = "qatest", target = self.qa_test_cmd_looper, args = ( qaloop, msg.frm, msg, args ) )
-        # thread.start()
-        # time.sleep(10)
-        # self.log.debug(asyncio.Task.all_tasks(qaloop))
-        asyncio.run( self.qa_test_cmd_runner( msg.frm, msg, args ) )
+    # @botcmd
+    # def qatest( self, msg, args ):  # a command callable with /register
+    #     asyncio.run( self.qa_test_cmd_runner( msg.frm, msg, args ) )
 
-    async def qa_test_cmd_runner( self, user, msg, args ):
-        ind, con = self.find_context_by_user( user )
-        resp = "NO RESPONSE"
+    # async def qa_test_cmd_runner( self, user, msg, args ):
+    #     ind, con = self.find_context_by_user( user )
+    #     resp = "NO RESPONSE"
 
-        if ( ind < 0 ):
-            con = discourse_context.DiscourseContext(self, "dc_qa_test", msg.frm, 10 )
-            self.contexts.append( con )
-            self.log.debug( f"added context for user {user} contexts: {self.contexts}")
-            ret = await self.qa_test_cmd( user, msg, args )
-            self.delete_context( ind )
-        else:
-            self.send( user, "You are already in a dialogue")
-            self.send( user, "Enter cancel to terminate previous dialog")            
-            return "User already started a discourse"
+    #     if ( ind < 0 ):
+    #         con = discourse_context.DiscourseContext(self, "dc_qa_test", msg.frm, 10 )
+    #         self.contexts.append( con )
+    #         self.log.debug( f"added context for user {user} contexts: {self.contexts}")
+    #         ret = await self.qa_test_cmd( user, msg, args )
+    #         self.delete_context( ind )
+    #     else:
+    #         self.send( user, "You are already in a dialogue")
+    #         self.send( user, "Enter cancel to terminate previous dialog")            
+    #         return "User already started a discourse"
         
-    async def qa_test_cmd( self, user, msg, args ):
-        self.log.debug("qa_test_cmd started")
-        ind, con = self.find_context_by_user( user )
-        if ind >= 0:
-            await con.async_send( user, "Are you ready to test the system?")
-            await con.async_send( user, "Please enter your name?")
-            name, err = await con.async_receive( )
-            self.log.debug( f"qa_test_cmd received {name},{err}")
-            if err:
-                if err == "Timeout":
-                    await con.async_send(user, "The command timed out")
-                    return "Command timeout"
-                else:
-                    await con.async_send( user, f"The command was cancelled {err}")
-                    return "Command cancelled"
-            await con.async_send( user, f"Nice to meet you user {name}")
-            return None
-        else:
-            self.send( f" qatest: context {user} not found")
-        return "Invalid Context"
+    # async def qa_test_cmd( self, user, msg, args ):
+    #     self.log.debug("qa_test_cmd started")
+    #     ind, con = self.find_context_by_user( user )
+    #     if ind >= 0:
+    #         await con.async_send( user, "Are you ready to test the system?")
+    #         await con.async_send( user, "Please enter your name?")
+    #         name, err = await con.async_receive( )
+    #         self.log.debug( f"qa_test_cmd received {name},{err}")
+    #         if err:
+    #             if err == "Timeout":
+    #                 await con.async_send(user, "The command timed out")
+    #                 return "Command timeout"
+    #             else:
+    #                 await con.async_send( user, f"The command was cancelled {err}")
+    #                 return "Command cancelled"
+    #         await con.async_send( user, f"Nice to meet you user {name}")
+    #         return None
+    #     else:
+    #         self.send( f" qatest: context {user} not found")
+    #     return "Invalid Context"
 

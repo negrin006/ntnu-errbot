@@ -2,122 +2,32 @@ import discourse_context
 import question_answer_discourse
 import menu_discourse
 import time
-
-DC_INIT, DC_SUCCESS, DC_CANCEL, DC_FINAL, \
-DC_NAME_INIT, DC_NAME, DC_NAME_FINISH, \
-DC_ID_INIT, DC_ID, DC_ID_FINISH, \
-DC_COURSE_INIT, DC_COURSE, DC_COURSE_FINISH, \
-DC_REGISTER_PROMPT_1, DC_REGISTER_INIT, DC_REGISTER, DC_REGISTER_FINISH, DC_REGISTER_CONFIRM, \
-DC_DO_CANCEL_PRE, DC_DO_CANCEL = range(20)
-
-CANCEL_RESPONSES = ["cancel", "quit", "no", "bye"]
+import asyncio
 
 class RegisterDiscourse(discourse_context.DiscourseContext):
-    def __init__(self, bot, author, success_cmd = None, cancel_cmd = None, timeout = 5 ):
-        super().__init__( 'Course Registration', bot, author, success_cmd, cancel_cmd, timeout )
+    def __init__(self, bot, user, timeout = 10 ):
+        super().__init__( bot, 'Course Registration', user, timeout )
         self.child = None
 
-    def step( self, response = None ):
-        nxt = None
+    def run(self, msg, args ):
+        super().run( self.register_cmd(  msg, args ) )
+        self.bot.delete_context( self )
 
-        while (nxt is None ) and (not self.is_processed() ):
-            self.end_time = time.time() + self.timeout
-            self.log.info( f"RegisterDiscourse.step({response}) state {self.state} values {self.values}")
-            if (self.state == DC_INIT ):
-                nxt = ('send', self.user, 'Starting course registration. You can cancel registration by entering "quit" when prompted for information')
-                self.values = { 'name' : None, 'id' : None, 'course' : None }
-                self.state = DC_NAME_INIT
-            elif (self.state == DC_NAME_INIT):
-                self.child = question_answer_discourse.QADiscourse(self.bot, "register name", self.user, "What is your name?" )
-                self.state = DC_NAME
-            elif (self.state == DC_NAME):
-                if ( not self.child.is_filled() ):
-                    nxt = self.child.step( response )
-                else:
-                    self.state = DC_NAME_FINISH
-            elif ( self.state == DC_NAME_FINISH ):
-                    if ( self.child.state == DC_SUCCESS ):
-                        self.values["name"] = self.child.values["answer"]
-                        self.state = DC_ID_INIT
-                    else:
-                        self.state = DC_DO_CANCEL_PRE
-                    self.child.reclaim()
-                    self.child = None
-            elif (self.state == DC_ID_INIT):
-                self.child = question_answer_discourse.QADiscourse(self.bot, "register id", self.user, "What is your student id?")
-                self.state = DC_ID
-            elif (self.state == DC_ID):
-                if ( not self.child.is_filled() ):
-                    nxt = self.child.step( response )
-                else:
-                    self.state = DC_ID_FINISH
-            elif ( self.state == DC_ID_FINISH ):
-                    if ( self.child.state == DC_SUCCESS ):
-                        self.values["id"] = self.child.values["answer"]
-                        self.state = DC_COURSE_INIT
-                    else:
-                        self.state = DC_DO_CANCEL_PRE
-                    self.child.reclaim()
-                    self.child = None
-            elif (self.state == DC_COURSE_INIT ):
-                self.child = menu_discourse.MenuDiscourse( self.bot, "course menu", self.user, "Which course do you want to register in?", [ "Artificial Intelligence (NKUST)", "Simultaneous Localization and Mapping (NTNU)", "Reinforcement Learning (NTNU)"] )
-                self.state = DC_COURSE
-            elif (self.state == DC_COURSE ):
-                if ( not self.child.is_filled() ):
-                    nxt = self.child.step( response )
-                else:
-                    self.state = DC_COURSE_FINISH
-            elif (self.state == DC_COURSE_FINISH):
-                    if ( self.child.state == DC_SUCCESS ):
-                        self.values["course"] = self.child.values["answer"]
-                        self.state = DC_REGISTER_PROMPT_1
-                    else:
-                        self.state = DC_DO_CANCEL_PRE
-                    self.child.reclaim()
-                    self.child = None
-            elif (self.state == DC_REGISTER_PROMPT_1):
-                card = {
-                    'title' : 'Course Registration',
-                    'fields' : (
-                        ('Name', self.values['name'] ),
-                        ('Student Id', self.values['id'] ),
-                        ('Course', self.values['course']),
-                    ),
-                    'to': self.user
-                }
-                nxt = ('send_card', self.user, card )
-                self.state = DC_REGISTER_INIT
-            elif (self.state == DC_REGISTER_INIT ):
-                self.child = question_answer_discourse.QADiscourse(self.bot, "register id", self.user, "Do you want to register this user?")                
-                self.state = DC_REGISTER
-            elif (self.state == DC_REGISTER):
-                if ( not self.child.is_filled() ):
-                    nxt = self.child.step( response )
-                else:
-                    self.state = DC_REGISTER_FINISH
-            elif ( self.state == DC_REGISTER_FINISH ):
-                if ( self.child.state == DC_SUCCESS ):
-                    ans = self.child.values["answer"]
-                    if (ans.lower() == 'yes' ):
-                        self.state = DC_REGISTER_CONFIRM
-                else:
-                    self.state = DC_DO_CANCEL_PRE
-                self.child.reclaim()
-                self.child = None
-            elif ( self.state == DC_REGISTER_CONFIRM ):
-                if self.success_cmd:
-                    self.success_cmd( self.bot, self.values )
-                self.state = DC_FINAL
-            elif ( self.state == DC_DO_CANCEL_PRE ):
-                nxt = ("send", self.user, "Course registration cancelled")
-                self.state = DC_DO_CANCEL
-            elif (self.state == DC_DO_CANCEL):
-                self.cancel()
-                if (self.cancel_cmd):
-                    self.cancel_cmd( self.bot, "Command was cancelled" )
+    async def register_cmd( self, msg, args ):
+        self.log.debug("register_cmd started")
 
-        self.last = nxt
-        self.log.info( f"RegisterDiscourse.step returns state {self.state} values {self.values} nxt {nxt}")
+        await self.async_send( self.user, "Are you ready to test the system?")
+        await self.async_send( self.user, "Please enter your name?")
+        name, err = await self.async_receive( )
+        self.log.debug( f"register_cmd received {name},{err}")
+        if err:
+            if err == "@Timeout":
+                await self.async_send( self.user, "The command timed out")
+                return "Command timeout"
+            else:
+                await self.async_send( self.user, f"The command was cancelled {err}")
+                return "Command cancelled"
+        await self.async_send( self.user, f"Nice to meet you user {name}")
 
-        return nxt
-    
+
+
