@@ -17,17 +17,13 @@ class RegisterDiscourse(discourse_context.DiscourseContext):
         self.log.debug("register_cmd started")
 
         await self.async_send( self.user, "Are you ready to test the system?")
-        await self.async_send( self.user, "Please enter your name?")
-        name, err = await self.async_receive( )
-        self.log.debug( f"register_cmd received {name},{err}")
-        if err:
-            if err == "@Timeout":
-                await self.async_send( self.user, "The command timed out")
-                return "Command timeout"
-            else:
-                await self.async_send( self.user, f"The command was cancelled {err}")
-                return "Command cancelled"
-        await self.async_send( self.user, f"Nice to meet you user {name}")
-
+        name = await self.qa( "Please enter your name?" )
+        if name:
+            id = await self.qa( "Please enter your student id")
+            if id:
+                courses = ["SLAM", "CV", "RL" ]
+                select = await self.menu( courses )
+                if select:
+                    await self.async_send( self.user, f"Registering studentd {name} with {id} for course {courses[select]}" )
 
 

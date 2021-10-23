@@ -66,3 +66,35 @@ class DiscourseContext:
     def __del__(self):
         self.log.debug( f"destructor called for context {self.dc_name}")
 
+    async def qa(self, prompt ):
+        await self.async_send( self.user, prompt )
+        data, err = await self.async_receive( )
+        self.log.debug( f"qa received {data},{err}")
+        if err:
+            if err == "@Timeout":
+                await self.async_send( self.user, "Prompt cancelled due to timeout")
+            else:
+                await self.async_send( self.user, f"The command was cancelled by the user {err}")
+        return data
+
+    async def menu(self, options ):
+        for i,o in enumerate( options ):
+            await self.async_send( self.user, f'{i+1}: {o}' )
+    
+        select = -1
+        while ( select < 0 ) or ( select >= len(options) ):
+            await self.async_send( self.user, f"Enter a number from 1 tp {len(options)}")
+            data, err = await self.async_receive( )
+            self.log.debug( f"menu received {data},{err}")
+            if err:
+                if err == "@Timeout":
+                    await self.async_send( self.user, "Prompt cancelled due to timeout")
+                    return None
+                else:
+                    await self.async_send( self.user, f"The command was cancelled by the user {err}")
+                    return None
+            try:
+                select = int(data.body) - 1
+            except ValueError:
+                select = -1
+        return select
