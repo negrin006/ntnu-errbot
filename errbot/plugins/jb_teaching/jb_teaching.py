@@ -19,8 +19,9 @@ class JB_TeachingPlugin(BotPlugin):
         super().activate()
         self.nlp = spacy.load( "en_core_web_lg" )
 
-        self.register_prompts = [ self.nlp( "I would like to register for the course" ),
+        self.register_prompts = [ self.nlp( "i would like to register in the course" ),
             self.nlp( "please register me in the course" ),
+            self.nlp( "how to register in")
         ]
 
         self.courses = [ 
@@ -62,8 +63,10 @@ class JB_TeachingPlugin(BotPlugin):
 
             m = self.nlp( text )
             for r in self.register_prompts:
-                if r.similarity( m ) > 0.80:
+                self.log.debug( f'similarity: {r.similarity(m)} {r}')
+                if r.similarity( m ) > 0.95:
                     self.log.info( f'Found register prompt {text}' )
+                    self.send( mess.frm, "You want to register for a course")
                     course = self.extract_course( m )
                     self.log.info( f'course {course}')
                     for token in m:
